@@ -12,13 +12,14 @@ import (
 	"testing"
 
 	"github.com/sylabs/singularity/e2e/internal/e2e"
+	"github.com/sylabs/singularity/e2e/internal/testhelper"
 )
 
 type ctx struct {
 	env e2e.TestEnv
 }
 
-func (c *ctx) singularityEnv(t *testing.T) {
+func (c ctx) singularityEnv(t *testing.T) {
 	// Singularity defines a path by default. See singularityware/singularity/etc/init.
 	var defaultImage = "docker://alpine:3.8"
 	var defaultPath = "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
@@ -106,12 +107,11 @@ func (c *ctx) singularityEnv(t *testing.T) {
 
 // E2ETests is the main func to trigger the test suite
 func E2ETests(env e2e.TestEnv) func(*testing.T) {
-	c := &ctx{
+	c := ctx{
 		env: env,
 	}
 
-	return func(t *testing.T) {
-		// try to build from a non existen path
-		t.Run("singularityEnv", c.singularityEnv)
-	}
+	return testhelper.TestRunner(map[string]func(*testing.T){
+		"environment manipulation": c.singularityEnv,
+	})
 }

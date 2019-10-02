@@ -95,12 +95,12 @@ func (c *ctx) singularityKeySearch(t *testing.T) {
 		},
 		{
 			name:   "key search --url <open key server> <name>",
-			args:   []string{"search", "--url", "https://keyserver.2ndquadrant.com", "WestleyK"},
+			args:   []string{"search", "--url", "https://keyserver.ubuntu.com", "ftpmaster@ubuntu.com"},
 			stdout: "^Showing",
 		},
 		{
 			name:   "key search --url <open key server> <key id>",
-			args:   []string{"search", "--url", "https://keyserver.2ndquadrant.com", "0x0E92D0AC"},
+			args:   []string{"search", "--url", "https://keyserver.ubuntu.com", "0x991BC93C"},
 			stdout: "^Showing 1 results",
 		},
 		// TODO: add tests for --long-list after #4156 is solved
@@ -398,7 +398,7 @@ func (c *ctx) singularityKeyRemove(t *testing.T) {
 	}
 }
 
-func (c *ctx) singularityKeyNewpairWithLen(t *testing.T) {
+func (c ctx) singularityKeyNewpairWithLen(t *testing.T) {
 	// Create a unique keyring shared for all these tests
 	tempKeyring, cleanup := e2e.MakeTempDir(t, c.env.TestDir, "keyring-", "")
 	defer cleanup(t)
@@ -473,7 +473,7 @@ func (c *ctx) checkKeyLength(t *testing.T, expectedKeyLength int) {
 }
 
 // Run the 'key' tests in order
-func (c *ctx) singularityKeyCmd(t *testing.T) {
+func (c ctx) singularityKeyCmd(t *testing.T) {
 	c.singularityKeySearch(t)
 	c.singularityKeyList(t)
 	c.singularityKeyNewpair(t)
@@ -489,7 +489,7 @@ func (c *ctx) singularityKeyCmd(t *testing.T) {
 
 // E2ETests is the main func to trigger the test suite
 func E2ETests(env e2e.TestEnv) func(*testing.T) {
-	c := &ctx{
+	c := ctx{
 		env:                    env,
 		publicExportPath:       filepath.Join(env.TestDir, "public_key.asc"),
 		publicExportASCIIPath:  filepath.Join(env.TestDir, "public_ascii_key.asc"),

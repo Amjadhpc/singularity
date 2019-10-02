@@ -604,11 +604,12 @@ func formatMROutput(mrString string) (int, []byte, error) {
 }
 
 // SearchPubkey connects to a key server and searches for a specific key
-func SearchPubkey(search, keyserverURI, authToken string, longOutput bool) error {
+func SearchPubkey(httpClient *http.Client, search, keyserverURI, authToken string, longOutput bool) error {
 	// Get a Key Service client.
 	c, err := client.NewClient(&client.Config{
-		BaseURL:   keyserverURI,
-		AuthToken: authToken,
+		BaseURL:    keyserverURI,
+		AuthToken:  authToken,
+		HTTPClient: httpClient,
 	})
 	if err != nil {
 		return err
@@ -796,7 +797,7 @@ func formatMROutputLongList(mrString string) (int, []byte, error) {
 }
 
 // FetchPubkey pulls a public key from the Key Service.
-func FetchPubkey(fingerprint, keyserverURI, authToken string, noPrompt bool) (openpgp.EntityList, error) {
+func FetchPubkey(httpClient *http.Client, fingerprint, keyserverURI, authToken string, noPrompt bool) (openpgp.EntityList, error) {
 
 	// Decode fingerprint and ensure proper length.
 	var fp []byte
@@ -812,8 +813,9 @@ func FetchPubkey(fingerprint, keyserverURI, authToken string, noPrompt bool) (op
 
 	// Get a Key Service client.
 	c, err := client.NewClient(&client.Config{
-		BaseURL:   keyserverURI,
-		AuthToken: authToken,
+		BaseURL:    keyserverURI,
+		AuthToken:  authToken,
+		HTTPClient: httpClient,
 	})
 	if err != nil {
 		return nil, err
@@ -1003,7 +1005,11 @@ func findEntityByFingerprint(entities openpgp.EntityList, fingerprint [20]byte) 
 
 // importPrivateKey imports the specified openpgp Entity, which should
 // represent a private key. The entity is added to the private keyring.
-func (keyring *Handle) importPrivateKey(entity *openpgp.Entity) error {
+func (keyring *Handle) importPrivateKey(entity *openpgp.Entity, setNewPassword bool) error {
+	if entity.PrivateKey == nil {
+		return fmt.Errorf("corrupted key, unable to recover data")
+	}
+
 	// Load the local private keys as entitylist
 	privateEntityList, err := keyring.LoadPrivKeyring()
 	if err != nil {
@@ -1014,38 +1020,35 @@ func (keyring *Handle) importPrivateKey(entity *openpgp.Entity) error {
 		return &KeyExistsError{fingerprint: entity.PrivateKey.Fingerprint}
 	}
 
-	// Check if the key is encrypted, if it is, decrypt it
-	if entity.PrivateKey == nil {
-		return fmt.Errorf("corrupted key, unable to recover data")
-	}
+	newEntity := *entity
 
-	// Make a clone of the entity
-	newEntity := &openpgp.Entity{
-		PrimaryKey:  entity.PrimaryKey,
-		PrivateKey:  entity.PrivateKey,
-		Identities:  entity.Identities,
-		Revocations: entity.Revocations,
-		Subkeys:     entity.Subkeys,
-	}
-
+	var password string
 	if entity.PrivateKey.Encrypted {
-		if err := DecryptKey(newEntity, "Enter your old password : "); err != nil {
+		password, err = interactive.AskQuestionNoEcho("Enter your key password : ")
+		if err != nil {
+			return err
+		}
+		if err := newEntity.PrivateKey.Decrypt([]byte(password)); err != nil {
 			return err
 		}
 	}
 
-	// Get a new password for the key
-	newPass, err := interactive.GetPassphrase("Enter a new password for this key : ", 3)
-	if err != nil {
-		return err
+	if setNewPassword {
+		// Get a new password for the key
+		password, err = interactive.GetPassphrase("Enter a new password for this key : ", 3)
+		if err != nil {
+			return err
+		}
 	}
 
-	if err := EncryptKey(newEntity, newPass); err != nil {
-		return err
+	if password != "" {
+		if err := newEntity.PrivateKey.Encrypt([]byte(password)); err != nil {
+			return err
+		}
 	}
 
 	// Store the private key
-	if err := keyring.appendPrivateKey(newEntity); err != nil {
+	if err := keyring.appendPrivateKey(&newEntity); err != nil {
 		return err
 	}
 
@@ -1075,7 +1078,7 @@ func (keyring *Handle) importPublicKey(entity *openpgp.Entity) error {
 // ImportKey imports one or more keys from the specified file. The keys
 // can be either a public or private keys, and the file can be either in
 // binary or ascii-armored format.
-func (keyring *Handle) ImportKey(kpath string) error {
+func (keyring *Handle) ImportKey(kpath string, setNewPassword bool) error {
 	// Load the private key as an entitylist
 	pathEntityList, err := loadKeysFromFile(kpath)
 	if err != nil {
@@ -1085,7 +1088,7 @@ func (keyring *Handle) ImportKey(kpath string) error {
 	for _, pathEntity := range pathEntityList {
 		if pathEntity.PrivateKey != nil {
 			// We have a private key
-			err := keyring.importPrivateKey(pathEntity)
+			err := keyring.importPrivateKey(pathEntity, setNewPassword)
 			if err != nil {
 				return err
 			}
@@ -1112,7 +1115,7 @@ func (keyring *Handle) ImportKey(kpath string) error {
 }
 
 // PushPubkey pushes a public key to the Key Service.
-func PushPubkey(e *openpgp.Entity, keyserverURI, authToken string) error {
+func PushPubkey(httpClient *http.Client, e *openpgp.Entity, keyserverURI, authToken string) error {
 	keyText, err := serializeEntity(e, openpgp.PublicKeyType)
 	if err != nil {
 		return err
@@ -1120,8 +1123,9 @@ func PushPubkey(e *openpgp.Entity, keyserverURI, authToken string) error {
 
 	// Get a Key Service client.
 	c, err := client.NewClient(&client.Config{
-		BaseURL:   keyserverURI,
-		AuthToken: authToken,
+		BaseURL:    keyserverURI,
+		AuthToken:  authToken,
+		HTTPClient: httpClient,
 	})
 	if err != nil {
 		return err

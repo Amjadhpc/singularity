@@ -15,6 +15,7 @@ import (
 	"testing"
 
 	"github.com/sylabs/singularity/e2e/internal/e2e"
+	"github.com/sylabs/singularity/e2e/internal/testhelper"
 	"gotest.tools/v3/assert"
 	"gotest.tools/v3/golden"
 )
@@ -44,7 +45,7 @@ var helpOciContentTests = []struct {
 	{"HelpOciUpdate", []string{"oci", "update"}},
 }
 
-func (c *ctx) testHelpOciContent(t *testing.T) {
+func (c ctx) testHelpOciContent(t *testing.T) {
 	for _, tc := range helpOciContentTests {
 
 		name := fmt.Sprintf("help-%s.txt", strings.Join(tc.cmds, "-"))
@@ -71,7 +72,7 @@ func (c *ctx) testHelpOciContent(t *testing.T) {
 	}
 }
 
-func (c *ctx) testCommands(t *testing.T) {
+func (c ctx) testCommands(t *testing.T) {
 	testCommands := []struct {
 		name string
 		cmd  string
@@ -151,7 +152,7 @@ func (c *ctx) testCommands(t *testing.T) {
 
 }
 
-func (c *ctx) testFailure(t *testing.T) {
+func (c ctx) testFailure(t *testing.T) {
 	if !c.env.RunDisabled {
 		t.Skip("disabled until issue addressed") // TODO
 	}
@@ -189,7 +190,7 @@ const (
 	helpHelpExpectedOutput = "Help about any command"
 )
 
-func (c *ctx) testSingularity(t *testing.T) {
+func (c ctx) testSingularity(t *testing.T) {
 	tests := []struct {
 		name           string
 		argv           []string
@@ -260,15 +261,14 @@ func (c *ctx) testSingularity(t *testing.T) {
 
 // E2ETests is the main func to trigger the test suite
 func E2ETests(env e2e.TestEnv) func(*testing.T) {
-	c := &ctx{
+	c := ctx{
 		env: env,
 	}
 
-	return func(t *testing.T) {
-		// try to build from a non existen path
-		t.Run("testCommands", c.testCommands)
-		t.Run("testFailure", c.testFailure)
-		t.Run("testSingularity", c.testSingularity)
-		t.Run("testHelpContent", c.testHelpOciContent)
-	}
+	return testhelper.TestRunner(map[string]func(*testing.T){
+		"commands":     c.testCommands,
+		"failure":      c.testFailure,
+		"help content": c.testHelpOciContent,
+		"singularity":  c.testSingularity,
+	})
 }

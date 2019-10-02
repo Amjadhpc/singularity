@@ -24,7 +24,7 @@ type ctx struct {
 const imgURL = "library://sylabs/tests/unsigned:1.0.0"
 const imgName = "testImage.sif"
 
-func (c *ctx) singularitySignHelpOption(t *testing.T) {
+func (c ctx) singularitySignHelpOption(t *testing.T) {
 	c.env.KeyringDir = c.keyringDir
 	c.env.RunSingularity(
 		t,
@@ -55,7 +55,7 @@ func (c *ctx) prepareImage(t *testing.T) (string, func(*testing.T)) {
 	}
 }
 
-func (c *ctx) singularitySignIDOption(t *testing.T) {
+func (c ctx) singularitySignIDOption(t *testing.T) {
 	imgPath, cleanup := c.prepareImage(t)
 	defer cleanup(t)
 
@@ -67,13 +67,13 @@ func (c *ctx) singularitySignIDOption(t *testing.T) {
 	}{
 		{
 			name:       "sign deffile",
-			args:       []string{"--id", "0", imgPath},
+			args:       []string{"--sif-id", "0", imgPath},
 			expectOp:   e2e.ExpectOutput(e2e.ContainMatch, "Signature created and applied to "+imgPath),
 			expectExit: 0,
 		},
 		{
 			name:       "sign non-exsistent ID",
-			args:       []string{"--id", "5", imgPath},
+			args:       []string{"--sif-id", "5", imgPath},
 			expectOp:   e2e.ExpectError(e2e.ContainMatch, "no descriptor found for id 5"),
 			expectExit: 2,
 		},
@@ -95,7 +95,7 @@ func (c *ctx) singularitySignIDOption(t *testing.T) {
 	}
 }
 
-func (c *ctx) singularitySignGroupIDOption(t *testing.T) {
+func (c ctx) singularitySignGroupIDOption(t *testing.T) {
 	imgPath, cleanup := c.prepareImage(t)
 	defer cleanup(t)
 
@@ -135,7 +135,7 @@ func (c *ctx) singularitySignGroupIDOption(t *testing.T) {
 	}
 }
 
-func (c *ctx) singularitySignKeyidxOption(t *testing.T) {
+func (c ctx) singularitySignKeyidxOption(t *testing.T) {
 	imgPath, cleanup := c.prepareImage(t)
 	defer cleanup(t)
 
@@ -178,7 +178,7 @@ func (c *ctx) generateKeypair(t *testing.T) {
 
 // E2ETests is the main func to trigger the test suite
 func E2ETests(env e2e.TestEnv) func(*testing.T) {
-	c := &ctx{
+	c := ctx{
 		env: env,
 	}
 
